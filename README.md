@@ -74,5 +74,6 @@ python main.py
 ### 5. Run the Streamlit Frontend (UI)
 
 ```bash
+#Note:main.py should be running in background
 streamlit run streamlit_app.py
 ```
