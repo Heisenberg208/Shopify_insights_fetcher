@@ -2,14 +2,12 @@
 from fastapi import FastAPI, HTTPException
 from services.scrapper import ShopifyScraperService
 from utils.logger import logger
-from urllib.parse import urljoin, urlparse
-
 from datetime import datetime
 
 from models.insights_models import  BrandInsights, InsightsRequest
 
 
-
+API_PREFIX="/api/v1"
 
 app = FastAPI(
     title="Shopify Store Insights Fetcher",
@@ -19,7 +17,7 @@ app = FastAPI(
 
 scraper_service = ShopifyScraperService()
 
-@app.post("/fetch-insights", response_model=BrandInsights)
+@app.post(f"{API_PREFIX}/fetch/insights", response_model=BrandInsights)
 async def fetch_insights(request: InsightsRequest):
     """
     Fetch comprehensive insights from a Shopify store
@@ -42,11 +40,11 @@ async def root():
         "message": "Shopify Store Insights Fetcher API",
         "version": "1.0.0",
         "endpoints": {
-            "POST /fetch-insights": "Fetch insights from a Shopify store",
+            f"POST {API_PREFIX}/fetch/insights": "Fetch insights from a Shopify store",
             "GET /": "API information"
         },
         "usage": {
-            "endpoint": "/fetch-insights",
+            "endpoint": f"{API_PREFIX}/fetch/insights",
             "method": "POST",
             "body": {
                 "website_url": "https://example.myshopify.com"
