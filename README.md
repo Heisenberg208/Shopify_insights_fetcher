@@ -74,5 +74,5 @@ python main.py
 ### 5. Run the Streamlit Frontend (UI)
 
 ```bash
-streamlit run ui/streamlit_app.py
+streamlit run streamlit_app.py
 ```
