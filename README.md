@@ -77,3 +77,32 @@ python main.py
 #Note:main.py should be running in background
 streamlit run streamlit_app.py
 ```
+
+## Future Enhancements
+
+### Gemini AI Integration
+
+Use Google Gemini to:
+
+- Summarize product catalogs or brand tone
+- Auto-generate product descriptions
+- Extract tone/style from FAQ and policy pages
+
+### Visual Analytics
+
+Display interactive charts and graphs (using `plotly` or `matplotlib`) for:
+
+- Product price distributions
+- Top product categories
+- Social media presence breakdown
+
+### Batch URL Upload
+
+- Support uploading `.csv` or `.txt` files with multiple Shopify store URLs
+
+- Automatically generate insights for all and display them in a structured table or dashboard
+
+### Export to CSV / PDF
+
+- Allow users to download the entire
+  extracted insights in `.csv` or `.pdf` formats with a single click
