@@ -3,15 +3,13 @@ from fastapi import FastAPI, HTTPException
 from services.scrapper import ShopifyScraperService
 from utils.logger import logger
 from urllib.parse import urljoin, urlparse
-import google.generativeai as genai
-import os
+
 from datetime import datetime
 
 from models.insights_models import  BrandInsights, InsightsRequest
 
 
-# Configure Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 app = FastAPI(
     title="Shopify Store Insights Fetcher",

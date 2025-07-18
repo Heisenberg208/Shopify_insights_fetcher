@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from fastapi import  HTTPException
 from typing import List, Optional, Dict, Any
 import requests
@@ -6,7 +8,7 @@ import json
 import re
 from utils.logger import logger
 from urllib.parse import urljoin, urlparse
-import google.generativeai as genai
+
 
 from datetime import datetime
 
@@ -18,7 +20,7 @@ class ShopifyScraperService:
         self.session = requests.Session()
         self.session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                      '(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        '(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
         'Referer': 'https://www.google.com/',
@@ -27,7 +29,6 @@ class ShopifyScraperService:
         'Upgrade-Insecure-Requests': '1',
         })
 
-        self.gemini_model = genai.GenerativeModel('gemini-pro')
     
     def extract_insights(self, website_url: str) -> BrandInsights:
         """Main method to extract all insights from a Shopify store"""
@@ -120,11 +121,6 @@ class ShopifyScraperService:
         domain = urlparse(base_url).netloc
         return domain.replace('www.', '').split('.')[0].title()
 
-    def clean_html_description(html: str) -> str:
-        soup = BeautifulSoup(html, 'html.parser')
-        text = soup.get_text(separator="\n")
-        return re.sub(r'\n{2,}', '\n\n', text.strip())
-
     def _extract_brand_description(self, soup: BeautifulSoup) -> Optional[str]:
         """Extract brand description from meta tags or content"""
         # Try meta description
@@ -145,6 +141,76 @@ class ShopifyScraperService:
                 return text[:500] + "..." if len(text) > 500 else text
         
         return None
+
+    def format_description(self, description: str) -> str:
+        """Fallback logic-based description formatter"""
+        # Split into parts
+        parts = [p.strip() for p in description.split('\n\n') if p.strip()]
+        
+        details = {}
+        marketing_desc = ""
+        
+        # Process key-value pairs
+        for part in parts:
+            if '\n' in part:
+                key, *values = part.split('\n')
+                details[key.strip()] = ' '.join(v.strip() for v in values)
+            elif not marketing_desc:
+                marketing_desc = part
+        
+        # Build formatted description
+        formatted = []
+        
+        # Product Details section
+        formatted.append("**Product Details**")
+        if 'Product Type' in details:
+            type_desc = details['Product Type']
+            if 'Includes' in details:
+                type_desc += f" ({details['Includes']})"
+            formatted.append(f"- Type: {type_desc}")
+        
+        if 'Fabric' in details:
+            formatted.append(f"- Fabric: {details['Fabric']}")
+        
+        if 'Color' in details:
+            color_desc = details['Color']
+            if 'Print' in details:
+                color_desc = f"{details['Print']} {color_desc}"
+            formatted.append(f"- Color: {color_desc}")
+        
+        if 'Fit' in details:
+            formatted.append(f"- Fit: {details['Fit']}")
+        
+        if 'Sleeves' in details:
+            formatted.append(f"- Sleeves: {details['Sleeves']}")
+        
+        # Additional Info section
+        formatted.append("\n**Additional Information**")
+        if 'Product SKU' in details:
+            formatted.append(f"- SKU: {details['Product SKU']}")
+        
+        if 'Manufactured By' in details:
+            formatted.append(f"- Manufacturer: {details['Manufactured By']}")
+        
+        # Size Info
+        if 'The Model is wearing' in marketing_desc:
+            formatted.append("\n**Size Info**")
+            formatted.append(f"- Model wears: {marketing_desc.split('The Model is wearing')[-1].strip()}")
+        
+        # Care Instructions
+        formatted.append("\n**Care Instructions**")
+        if 'Wash Care' in details:
+            formatted.append(f"- {details['Wash Care']}")
+        else:
+            formatted.append("- Please check garment care label")
+        
+        # Marketing Description
+        if marketing_desc and 'The Model is wearing' not in marketing_desc:
+            formatted.append("\n**Description**")
+            formatted.append(marketing_desc)
+        
+        return '\n'.join(formatted)
+
     
     def _extract_product_catalog(self, base_url: str) -> List[Product]:
         """Extract product catalog from /products.json"""
@@ -175,7 +241,7 @@ class ShopifyScraperService:
                     id=product_data.get('id'),
                     title=product_data.get('title', ''),
                     handle=product_data.get('handle', ''),
-                    description=BeautifulSoup(product_data.get('body_html', ''), 'html.parser').get_text(separator=' ').strip(),
+                    description=self.format_description(BeautifulSoup(product_data.get('body_html', ''), 'html.parser').get_text(separator=' ').strip()),
                     price=price,
                     images=images,
                     tags=product_data.get('tags', []),
@@ -216,34 +282,34 @@ class ShopifyScraperService:
         
         return hero_products
     def _discover_policy_links(self, soup: BeautifulSoup, keywords: List[str]) -> List[str]:
-      """Discover links with relevant keywords from the homepage"""
-      urls = []
-      for link in soup.find_all('a', href=True):
-          href = link['href']
-          if any(keyword in href.lower() for keyword in keywords):
-              urls.append(href)
-      return urls
+        """Discover links with relevant keywords from the homepage"""
+        urls = []
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if any(keyword in href.lower() for keyword in keywords):
+                urls.append(href)
+        return urls
 
     
     def _extract_policy(self, base_url: str, policy_type: str) -> Optional[str]:
-      keywords_map = {
-          'privacy': ['privacy'],
-          'refund': ['refund', 'return']
-      }
-      keywords = keywords_map.get(policy_type, [])
-      homepage_soup = self._get_page_soup(base_url)
-      candidate_links = self._discover_policy_links(homepage_soup, keywords)
+        keywords_map = {
+            'privacy': ['privacy'],
+            'refund': ['refund', 'return']
+        }
+        keywords = keywords_map.get(policy_type, [])
+        homepage_soup = self._get_page_soup(base_url)
+        candidate_links = self._discover_policy_links(homepage_soup, keywords)
 
-      for href in candidate_links:
-          policy_url = urljoin(base_url, href)
-          soup = self._get_page_soup(policy_url)
-          if soup:
-              content = soup.find(['main', 'article', 'div'], class_=re.compile(r'content|policy|page', re.I))
-              if content:
-                  text = content.get_text().strip()
-                  if len(text) > 100:
-                      return text[:1000] + "..." if len(text) > 1000 else text
-      return None
+        for href in candidate_links:
+            policy_url = urljoin(base_url, href)
+            soup = self._get_page_soup(policy_url)
+            if soup:
+                content = soup.find(['main', 'article', 'div'], class_=re.compile(r'content|policy|page', re.I))
+                if content:
+                    text = self.format_description(content.get_text().strip())
+                    if len(text) > 100:
+                        return text[:1000] + "..." if len(text) > 1000 else text
+        return None
 
     
     def _extract_faqs(self, base_url: str, home_soup: BeautifulSoup) -> List[FAQ]:
